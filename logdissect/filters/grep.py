@@ -21,31 +21,39 @@
 # SOFTWARE.
 
 import re
+from logdissect.filters import registry
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the grep filter module"""
         self.name = "grep"
         self.desc = "match a pattern"
+        self.required_fields = ['raw_text']
+        self.priority = 30
+        self.options = [
+            OptionSpec('--grep', dest='pattern', action='append',
+                    type=str, short_flag='-g', metavar='PATTERN',
+                    help='match a pattern'),
+        ]
 
-        if args:
-            args.add_argument('--grep', action='append', dest='pattern',
-                    help='match a pattern')
+    def filter_data(self, data, values=None, args=None, **kwargs):
+        """Return entries containing specified patterns (single log)
 
-    def filter_data(self, data, values=None, args=None):
-        """Return entries containing specified patterns (single log)"""
-        if args:
-            if not args.pattern:
-                return data
-        if not values: values = args.pattern
+        Multiple patterns combine with OR semantics (an entry is kept if
+        it matches any of them), matching the legacy CLI behavior.
+        """
+        if values is None and args is not None:
+            values = getattr(args, 'pattern', None)
+        if not values:
+            return data
         newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
+        for key in ('parser', 'source_path', 'source_file',
+                'source_file_mtime', 'source_file_year'):
+            if key in data:
+                newdata[key] = data[key]
         newdata['entries'] = []
 
         repatterns = {}

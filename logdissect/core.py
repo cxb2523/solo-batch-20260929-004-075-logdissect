@@ -25,10 +25,13 @@
 import os
 import sys
 import string
+from types import SimpleNamespace
 import logdissect.parsers
 import logdissect.filters
 import logdissect.output
 from logdissect import __version__
+from logdissect.filters import registry as filter_registry
+from logdissect.filters.plan import render_text as render_filter_plan
 from argparse import ArgumentParser
 import gettext
 gettext.install('logdissect')
@@ -51,17 +54,71 @@ class LogDissectCore:
                 self.arg_parser.add_argument_group('filter options')
         self.output_args = \
                 self.arg_parser.add_argument_group('output options')
-    
-    
+
+    def _build_config(self, config=None, files=None, argv=None):
+        """Build the args namespace from CLI argv or a library config.
+
+        Both entry points end up in the same argparse namespace:
+
+        * CLI -- the registered filter options are parsed from argv;
+        * library -- a config dict is coerced to the same shape
+          (scalars for repeatable options become one-item lists).
+
+        The registry-built filter plan is the only place filters run,
+        so identical configurations produce identical results.
+        """
+        if config is None and argv is None:
+            argv = sys.argv[1:]
+        if config is not None:
+            # parse_args() overwrites pre-set namespace attributes with
+            # option defaults, so parse the defaults first and layer the
+            # supplied configuration on top afterwards.
+            namespace = self.arg_parser.parse_args([])
+            for key, value in vars(
+                    self._namespace_from_config(config)).items():
+                setattr(namespace, key, value)
+            if files is not None:
+                namespace.files = list(files)
+            self.args = namespace
+        else:
+            self.args = self.arg_parser.parse_args(argv)
+        return self.args
+
+    def _namespace_from_config(self, config):
+        """Coerce a library config mapping/namespace to argparse shape."""
+        if hasattr(config, '__dict__') and not isinstance(config, dict):
+            source = vars(config)
+        else:
+            source = dict(config)
+        append_dests = set(spec.dest
+                for spec in filter_registry.options()
+                if spec.action == 'append')
+        # Library configs may use the long-flag spelling (grep=...) in
+        # addition to the argparse destination (pattern=...).
+        alias_to_dest = dict((spec.config_key, spec.dest)
+                for spec in filter_registry.options()
+                if spec.config_key != spec.dest)
+        normalized = {}
+        for key, value in source.items():
+            key = alias_to_dest.get(key, key)
+            if key in append_dests and value is not None and \
+                    not isinstance(value, (list, tuple)):
+                value = [value]
+            normalized[key] = value
+        return SimpleNamespace(**normalized)
+
         
     # run_job does the actual job using the other functions.
-    def run_job(self):
+    def run_job(self, config=None, files=None, argv=None):
         """Execute a logdissect job"""
         try:
             self.load_parsers()
             self.load_filters()
             self.load_outputs()
-            self.config_args()
+            self.config_args(config=config, files=files, argv=argv)
+            if getattr(self.args, 'filter_plan', False):
+                print(render_filter_plan(self.args))
+                return 0
             if self.args.list_parsers:
                 self.list_parsers()
             if self.args.verbosemode: print('Loading input files')
@@ -95,14 +152,10 @@ class LogDissectCore:
         del(parsedset)
 
     def run_filters(self):
-        for m in self.filter_modules:
-            ourfilter = self.filter_modules[m]
-            ourlog = ourfilter.filter_data(
-                    self.data_set['finalized_data'],
-                    args=self.args)
-            self.data_set['finalized_data'] = ourlog
-            del(ourlog)
-            del(ourfilter)
+        """Run the registry-built execution plan over the merged data."""
+        plan = filter_registry.build_plan(self.args)
+        self.data_set['finalized_data'] = filter_registry.apply_plan(
+                self.data_set['finalized_data'], self.args, plan=plan)
 
     def run_output(self):
         """Output finalized data"""
@@ -121,12 +174,12 @@ class LogDissectCore:
 
 
 
-    def config_args(self):
+    def config_args(self, config=None, files=None, argv=None):
         """Set config options"""
         # Module list options:
         self.arg_parser.add_argument('--version', action='version',
                 version='%(prog)s ' + str(__version__))
-        self.arg_parser.add_argument('--verbose',
+        self.arg_parser.add_argument('-v', '--verbose',
                 action='store_true', dest = 'verbosemode',
                 help=_('set verbose terminal output'))
         self.arg_parser.add_argument('-s',
@@ -144,16 +197,23 @@ class LogDissectCore:
         self.arg_parser.add_argument('-t',
                 action='store', dest='tzone',
                 help=_('specify timezone offset to UTC (e.g. \'+0500\')'))
+        self.arg_parser.add_argument('--filter-plan',
+                action='store_true', dest='filter_plan',
+                help=_('print the filter pipeline (options, dependent '
+                       'fields, execution order) and exit'))
         self.arg_parser.add_argument('files',
                 # nargs needs to be * not + so --list-filters/etc
                 # will work without file arg
                 metavar='file', nargs='*',
                 help=_('specify input files'))
 
-        # self.arg_parser.add_argument_group(self.parse_args)
-        self.arg_parser.add_argument_group(self.filter_args)
-        self.arg_parser.add_argument_group(self.output_args)
-        self.args = self.arg_parser.parse_args()
+        # Filter options are generated from the registry. Each filter
+        # self-reports its flags, value type and help text; the legacy
+        # long flags/metavars/help strings are preserved exactly. Any
+        # short-option collision raises FilterRegistrationError here.
+        filter_registry.add_arguments(self.filter_args)
+
+        self._build_config(config=config, files=files, argv=argv)
 
     
     
@@ -195,11 +255,9 @@ class LogDissectCore:
                 locals(), [logdissect]).ParseModule()
 
     def load_filters(self):
-        """Load filter module(s)"""
-        for f in sorted(logdissect.filters.__filters__):
-            self.filter_modules[f] = \
-                __import__('logdissect.filters.' + f, globals(), \
-                locals(), [logdissect]).FilterModule(args=self.filter_args)
+        """Load filter modules from the global filter registry."""
+        for name in sorted(filter_registry.names()):
+            self.filter_modules[name] = filter_registry.get(name)
 
     def load_outputs(self):
         """Load output module(s)"""

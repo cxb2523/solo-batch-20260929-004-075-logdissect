@@ -21,42 +21,52 @@
 # SOFTWARE.
 
 import re
+from logdissect.filters import registry
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the rgrep filter module"""
         self.name = "rgrep"
         self.desc = "filter out a pattern"
+        self.required_fields = ['raw_text']
+        self.priority = 60
+        self.options = [
+            OptionSpec('--rgrep', dest='rpattern', action='append',
+                    type=str, short_flag='-G', metavar='PATTERN',
+                    help='filter out a pattern'),
+        ]
 
-        if args:
-            args.add_argument('--rgrep', action='append', dest='rpattern',
-                    metavar='PATTERN', help='filter out a pattern')
+    def filter_data(self, data, values=None, args=None, **kwargs):
+        """Remove entries containing any specified pattern (single log)
 
-    def filter_data(self, data, values=None, args=None):
-        """Remove entries containing specified pattern (single log)"""
-        if args:
-            if not args.rpattern:
-                return data
-        if not values: values = args.rpattern
+        Entries matching *any* pattern are dropped. The legacy version
+        compiled every pattern from ``args.rpattern`` and crashed on
+        library calls without ``args``; both paths now share this code.
+        """
+        if values is None and args is not None:
+            values = getattr(args, 'rpattern', None)
+        if not values:
+            return data
         newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
+        for key in ('parser', 'source_path', 'source_file',
+                'source_file_mtime', 'source_file_year'):
+            if key in data:
+                newdata[key] = data[key]
         newdata['entries'] = []
 
         repatterns = {}
         for rpat in values:
-            repatterns[rpat] = re.compile(r".*({}).*".format(args.rpattern))
+            repatterns[rpat] = re.compile(r".*({}).*".format(rpat))
 
         for entry in data['entries']:
             match = False
-            for r in args.rpattern:
-                if re.match(repatterns[r], entry['raw_text']):
+            for rpat in values:
+                if re.match(repatterns[rpat], entry['raw_text']):
                     match = True
+                    break
 
             if not match:
                 newdata['entries'].append(entry)

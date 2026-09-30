@@ -20,36 +20,29 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the dest host filter module"""
         self.name = "dhost"
         self.desc = "match a destination host"
-
-        if args:
-            args.add_argument('--dhost', action='append', dest='dhost',
-                    help='match a destination host')
+        self.required_fields = ['dest_host']
+        self.priority = 30
+        self.options = [
+            OptionSpec('--dhost', dest='dhost', action='append',
+                    type=str, metavar='DHOST',
+                    help='match a destination host'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Return entries with specified destination host (single log)"""
-        if args:
-            if not args.dhost:
-                return data
-        if not values: values = args.dhost
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'dest_host' in entry.keys():
-                if entry['dest_host'] in values:
-                    newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'dhost', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'dest_host')

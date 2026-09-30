@@ -32,16 +32,16 @@ To install the latest release, see the latest instructions on the [releases page
 
 ## Options
 ```
-usage: logdissect.py [-h] [--dhost DHOST] [--grep PATTERN] [--last LAST]
-                     [--process PROCESS] [--protocol PROTOCOL] [--range RANGE]
-                     [--utc] [--rdhost DHOST] [--rgrep PATTERN]
-                     [--rprocess PROCESS] [--rprotocol PROTOCOL]
-                     [--rshost SHOST] [--rsource SOURCE] [--shost SHOST]
-                     [--source SOURCE] [--linejson LINEJSON] [--outlog OUTLOG]
+usage: logdissect.py [-h] [--linejson LINEJSON] [--outlog OUTLOG]
                      [--label LABEL] [--sojson SOJSON] [--pretty] [--version]
                      [--verbose] [-s] [--list-parsers] [-p PARSER] [-z]
-                     [-t TZONE]
-                     [file [file ...]]
+                     [-t TZONE] [--filter-plan] [--dhost DHOST] [-g PATTERN]
+                     [-L LAST] [--process PROCESS] [--protocol PROTOCOL]
+                     [-R RANGE] [--utc] [--rdhost DHOST] [-G PATTERN]
+                     [--rprocess PROCESS] [--rprotocol PROTOCOL]
+                     [--rshost SHOST] [--rsource SOURCE] [--shost SHOST]
+                     [--source SOURCE]
+                     [file ...]
 
 positional arguments:
   file                  specify input files
@@ -55,17 +55,22 @@ optional arguments:
   -p PARSER             select a parser (default: syslog)
   -z, --unzip           include files compressed with gzip
   -t TZONE              specify timezone offset to UTC (e.g. '+0500')
+  --filter-plan         print the filter pipeline (options, dependent
+                        fields, execution order) and exit
 
 filter options:
   --dhost DHOST         match a destination host
-  --grep PATTERN        match a pattern
-  --last LAST           match a preceeding time period (e.g. 5m/3h/2d/etc)
+  -g PATTERN, --grep PATTERN
+                        match a pattern
+  -L LAST, --last LAST  match a preceeding time period (e.g. 5m/3h/2d/etc)
   --process PROCESS     match a source process
   --protocol PROTOCOL   match a protocol
-  --range RANGE         match a time range (YYYYMMDDhhmm-YYYYMMDDhhmm)
+  -R RANGE, --range RANGE
+                        match a time range (YYYYMMDDhhmm-YYYYMMDDhhmm)
   --utc                 use UTC for range matching
   --rdhost DHOST        filter out a destination host
-  --rgrep PATTERN       filter out a pattern
+  -G PATTERN, --rgrep PATTERN
+                        filter out a pattern
   --rprocess PROCESS    filter out a source process
   --rprotocol PROTOCOL  filter out a protocol
   --rshost SHOST        filter out a source host
@@ -115,6 +120,46 @@ windowsrsyslog  : windows rsyslog agent log parsing module
 4. --last options: The last option should be a number followed by either 's' for seconds, 'm' for minutes, 'h' for hours, or 'd' for days (e.g. --last=20m).
 
 5. Multiple options: All non-time-based filters can be used more than once.
+
+## Filter pipeline
+Filters are self-registering modules. Each filter declares its CLI
+option(s), value type, the entry fields it depends on, and a static
+execution priority; `logdissect` generates the argparse options and
+pipeline order from that registry. Short-option collisions (including
+with core options like `-p`) raise an explicit error at startup.
+
+Execution order is static by priority, not a runtime topological sort:
+every filter is a predicate over a single entry, so no filter consumes
+data another filter produces and there is no dependency edge to sort.
+The time filters run first (`--last`, then `--range`), positive match
+filters run next, and reverse filters (`--rgrep`, `--rshost`, ...) --
+which are plain exclusion predicates -- run last.
+
+`--range` and `--last N` are cross-entry (stateful) filters. Under
+streaming input, entries are presented as completed groups and the
+stateful filters run against each whole group, which is the same data
+set a library call receives for that group, so both entry points return
+identical results for the same configuration.
+
+Print the full pipeline -- each filter's options, dependent fields and
+execution order, with active filters marked -- with `--filter-plan`, or
+generate an HTML page with `make filter-plan` (writes
+`build/filters.html`).
+
+Short options: `-g/--grep`, `-G/--rgrep`, `-L/--last`, `-R/--range`.
+The long flags, metavars and help text are unchanged.
+
+The same configuration may be supplied as a library mapping; long-flag
+spellings (`grep`) and argparse destinations (`pattern`) both work, and
+scalar values for repeatable options may be passed as a bare string:
+
+```
+from logdissect.core import LogDissectCore
+core = LogDissectCore()
+core.run_job(config={'grep': 'software', 'rgrep': ['dbus'],
+                     'silentmode': True},
+             files=['auth.log', 'messages'])
+```
 
 # Community
 

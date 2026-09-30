@@ -20,37 +20,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the reverse source host filter module"""
         self.name = "rshost"
         self.desc = "filter out a source host"
-
-        if args:
-            args.add_argument('--rshost', action='append', dest='rshost',
-                    metavar='SHOST', help='filter out a source host')
+        self.required_fields = ['source_host']
+        self.priority = 60
+        self.options = [
+            OptionSpec('--rshost', dest='rshost', action='append',
+                    type=str, metavar='SHOST',
+                    help='filter out a source host'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Remove entries from specified source host (single log)"""
-        if args:
-            if not args.rshost:
-                return data
-        if not values: values = args.rshost
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'source_host' in entry.keys():
-                if entry['source_host'] not in values:
-                    newdata['entries'].append(entry)
-            else: newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'rshost', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'source_host',
+                exclude=True)

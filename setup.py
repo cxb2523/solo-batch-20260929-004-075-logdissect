@@ -30,16 +30,16 @@ Options
 
 ::
 
-    usage: logdissect.py [-h] [--dhost DHOST] [--grep PATTERN] [--last LAST]
-                         [--process PROCESS] [--protocol PROTOCOL] [--range RANGE]
-                         [--utc] [--rdhost DHOST] [--rgrep PATTERN]
+    usage: logdissect.py [-h] [--linejson LINEJSON] [--outlog OUTLOG]
+                         [--label LABEL] [--sojson SOJSON] [--pretty]
+                         [--version] [--verbose] [-s] [--list-parsers]
+                         [-p PARSER] [-z] [-t TZONE] [--filter-plan]
+                         [--dhost DHOST] [-g PATTERN] [-L LAST]
+                         [--process PROCESS] [--protocol PROTOCOL]
+                         [-R RANGE] [--utc] [--rdhost DHOST] [-G PATTERN]
                          [--rprocess PROCESS] [--rprotocol PROTOCOL]
-                         [--rshost SHOST] [--rsource SOURCE] [--shost SHOST]
-                         [--source SOURCE] [--linejson LINEJSON] [--outlog OUTLOG]
-                         [--label LABEL] [--sojson SOJSON] [--pretty] [--version]
-                         [--verbose] [-s] [--list-parsers] [-p PARSER] [-z]
-                         [-t TZONE]
-                         [file [file ...]]
+                         [--rshost SHOST] [--rsource SOURCE]
+                         [--shost SHOST] [--source SOURCE] [file ...]
     
     positional arguments:
       file                  specify input files
@@ -56,14 +56,14 @@ Options
     
     filter options:
       --dhost DHOST         match a destination host
-      --grep PATTERN        match a pattern
-      --last LAST           match a preceeding time period (e.g. 5m/3h/2d/etc)
+      -g, --grep PATTERN    match a pattern
+      -L, --last LAST       match a preceeding time period (e.g. 5m/3h/2d/etc)
       --process PROCESS     match a source process
       --protocol PROTOCOL   match a protocol
-      --range RANGE         match a time range (YYYYMMDDhhmm-YYYYMMDDhhmm)
+      -R, --range RANGE     match a time range (YYYYMMDDhhmm-YYYYMMDDhhmm)
       --utc                 use UTC for range matching
       --rdhost DHOST        filter out a destination host
-      --rgrep PATTERN       filter out a pattern
+      -G, --rgrep PATTERN   filter out a pattern
       --rprocess PROCESS    filter out a source process
       --rprotocol PROTOCOL  filter out a protocol
       --rshost SHOST        filter out a source host

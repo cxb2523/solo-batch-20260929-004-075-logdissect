@@ -21,36 +21,29 @@
 # SOFTWARE.
 
 import re
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the process filter module"""
         self.name = "process"
         self.desc = "match a source process"
-
-        if args:
-            args.add_argument('--process', action='append', dest='process',
-                    help='match a source process')
+        self.required_fields = ['source_process']
+        self.priority = 30
+        self.options = [
+            OptionSpec('--process', dest='process', action='append',
+                    type=str, metavar='PROCESS',
+                    help='match a source process'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Return entries from specified process (single log)"""
-        if args:
-            if not args.process:
-                return data
-        if not values: values = args.process
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'source_process' in entry.keys():
-                if entry['source_process'] in values:
-                    newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'process', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'source_process')

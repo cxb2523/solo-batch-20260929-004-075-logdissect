@@ -54,3 +54,14 @@ test:
 	@echo - Times should be below 0m0.800s on an i3 for Python 3.
 	@echo - Diff results should be empty.
 	@echo
+
+filter-plan:
+	@echo Generating filter pipeline page at build/filters.html
+	@echo
+	python3 -m logdissect.filters --html build/filters.html
+	@echo
+	@echo - The page lists each filter\'s options, dependent fields
+	@echo - and execution order.
+	@echo
+
+.PHONY: all default install clean test filter-plan

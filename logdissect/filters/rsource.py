@@ -20,37 +20,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the reverse log source filter module"""
         self.name = "rsource"
         self.desc = "filter out a log source"
-
-        if args:
-            args.add_argument('--rsource', action='append', dest='rsource',
-                    metavar='SOURCE', help='filter out a log source')
+        self.required_fields = ['log_source']
+        self.priority = 60
+        self.options = [
+            OptionSpec('--rsource', dest='rsource', action='append',
+                    type=str, metavar='SOURCE',
+                    help='filter out a log source'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Remove entries from specified log source (single log)"""
-        if args:
-            if not args.rsource:
-                return data
-        if not values: values = args.rsource
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'log_source' in entry.keys:
-                if entry['log_source'] not in args.rsource:
-                    newdata['entries'].append(entry)
-            else: newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'rsource', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'log_source',
+                exclude=True)

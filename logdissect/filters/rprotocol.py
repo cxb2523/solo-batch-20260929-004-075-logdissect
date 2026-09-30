@@ -21,38 +21,30 @@
 # SOFTWARE.
 
 import re
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the rprotocol filter module"""
         self.name = "rprotocol"
         self.desc = "filter out a protocol"
-
-        if args:
-            args.add_argument('--rprotocol', action='append', dest='rprotocol',
-                    metavar='PROTOCOL', help='filter out a protocol')
+        self.required_fields = ['protocol']
+        self.priority = 60
+        self.options = [
+            OptionSpec('--rprotocol', dest='rprotocol', action='append',
+                    type=str, metavar='PROTOCOL',
+                    help='filter out a protocol'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Return entries without specified protocol (single log)"""
-        if args:
-            if not args.rprotocol:
-                return data
-        if not values: values = args.rprotocol
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'protocol' in entry.keys():
-                if entry['protocol'] not in values:
-                    newdata['entries'].append(entry)
-            else:
-                newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'rprotocol', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'protocol',
+                exclude=True)

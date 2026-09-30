@@ -2,8 +2,28 @@
 Change log for [logdissect](https://github.com/dogoncouch/logdissect)
 
 ## [Unreleased]
+### Added
+- Registration-based filter pipeline: filters self-report CLI
+  options, value types and dependent fields; argparse options and the
+  execution order are generated from the registry.
+- Short options `-g/--grep`, `-G/--rgrep`, `-L/--last`, `-R/--range`,
+  plus `-v/--verbose`; short-option collisions raise an explicit error.
+- `--filter-plan` flag and `make filter-plan` target (`build/filters.html`)
+  documenting each filter's options, dependent fields and execution order.
+- `LogDissectCore.run_job(config=..., files=...)` library entry point
+  sharing the CLI's pipeline, so the same config gives the same result.
+
+### Changed
+- Filters execute in static-priority order (time filters, positive
+  matchers, reverse filters); `range`/`last` run per completed group
+  under streaming input.
+
 ### Fixed
 - Tests will no longer break on year change.
+- `rgrep` library calls without an args object, and multiple `--rgrep`
+  patterns now compile/match correctly.
+- `rsource` library calls (`entry.keys` bug) and the `rdhost` module
+  name now work as documented.
 
 ## [3.1.1] 2018-04-07
 ### Fixed

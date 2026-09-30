@@ -147,6 +147,43 @@ Syntax for the `last` and `range` filters differs slighty. Instead of `values`, 
 
 Time-based filters filter on the `numeric_date_stamp` value. The `range` filter also has a `utc` keyword argument that defaults to `False`. If set to `True`, it will filter based on `numeric_date_stamp_utc`.
 
+### The filter registry and pipeline
+Filters self-register through `logdissect.filters.registry` on import.
+Each filter is a subclass of `logdissect.filters.type.Filter`
+(`FilterModule` is a backwards compatible alias) and declares:
+
+- `options` -- a list of `OptionSpec` objects describing the CLI flags
+  (`short_flag`, `long_flag`, `dest`, `action`, `type`, `metavar`,
+  `help`), e.g. `--grep`/`-g`;
+- `required_fields` -- the entry fields the filter depends on (e.g.
+  `raw_text`, `log_source`, `numeric_date_stamp_utc`);
+- `priority` -- static execution priority; `last`/`range` run first,
+  positive matchers next, reverse exclusion filters last;
+- `stateful` -- `True` for the cross-entry `range` and `last` filters.
+
+The registry generates argparse options (`registry.add_arguments`),
+builds the ordered plan (`registry.build_plan`,
+`registry.build_full_plan`), applies it (`registry.apply_plan`), and
+supports grouped streaming input with `registry.filter_stream`.
+Registering a filter that reuses a long flag, an activating
+destination, or a short flag already claimed by another filter or the
+core parser raises `FilterRegistrationError`.
+
+A whole job can also be driven from the library with the same
+configuration the CLI uses:
+
+```
+core = LogDissectCore()
+core.run_job(config={'grep': 'software', 'range': '20170101-20180101',
+                     'silentmode': True},
+             files=['messages', 'auth.log'])
+```
+
+Config keys may use the long-flag spelling (`grep`) or the argparse
+destination (`pattern`); repeatable options accept a scalar (wrapped in
+a list) or a list. This path runs the same registry plan as the CLI, so
+the results are identical for the same configuration.
+
 # Output Modules
 ## myoutput = logdissect.output.\<output\>.OutputModule()
 Replace \<output\> with one of the available filters:

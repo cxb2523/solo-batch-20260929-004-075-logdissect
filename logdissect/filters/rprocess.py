@@ -21,38 +21,30 @@
 # SOFTWARE.
 
 import re
+from logdissect.filters import registry
+from logdissect.filters import field_filter_data
 from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters.type import OptionSpec
 
+@registry.register
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize the process filter module"""
         self.name = "rprocess"
         self.desc = "filter out a source process"
-
-        if args:
-            args.add_argument('--rprocess', action='append', dest='rprocess',
-                    metavar='PROCESS', help='filter out a source process')
+        self.required_fields = ['source_process']
+        self.priority = 60
+        self.options = [
+            OptionSpec('--rprocess', dest='rprocess', action='append',
+                    type=str, metavar='PROCESS',
+                    help='filter out a source process'),
+        ]
 
     def filter_data(self, data, values=None, args=None):
         """Remove entries from specified process (single log)"""
-        if args:
-            if not args.rprocess:
-                return data
-        if not values: values = args.rprocess
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
-
-        for entry in data['entries']:
-            if 'source_process' in entry.keys():
-                if entry['source_process'] not in values:
-                    newdata['entries'].append(entry)
-            else:
-                newdata['entries'].append(entry)
-
-        return newdata
+        if values is None and args is not None:
+            values = getattr(args, 'rprocess', None)
+        if not values:
+            return data
+        return field_filter_data(data, values, 'source_process',
+                exclude=True)

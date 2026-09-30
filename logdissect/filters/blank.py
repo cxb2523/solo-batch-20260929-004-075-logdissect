@@ -24,9 +24,14 @@ from logdissect.filters.type import FilterModule as OurModule
 class FilterModule(OurModule):
     def __init__(self, args=None):
         """Initialize a filter module"""
-        self.name = ""
-        self.desc = ""
+        super(FilterModule, self).__init__(args)
+        self.name = "blank"
+        self.desc = "template for custom filters"
+        # self.required_fields = ['raw_text']
+        # self.priority = 100
+        # self.stateful = False
+        # self.options = []
 
-    def filter_data(self, data, values=None, args=None):
+    def filter_data(self, data, values=None, args=None, **kwargs):
         """Filter log data in some way (single log)"""
-        pass
+        return data
