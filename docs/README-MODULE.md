@@ -147,6 +147,27 @@ Syntax for the `last` and `range` filters differs slighty. Instead of `values`, 
 
 Time-based filters filter on the `numeric_date_stamp` value. The `range` filter also has a `utc` keyword argument that defaults to `False`. If set to `True`, it will filter based on `numeric_date_stamp_utc`.
 
+### Running the whole pipeline from configuration
+The CLI and the library share one registry defined pipeline.  `run_library_job`
+parses and merges files, then runs exactly the filters the CLI would run for
+the same option configuration, so both paths return identical output:
+```
+from logdissect.core import run_library_job
+
+result = run_library_job(
+        ['messages', 'debug'],
+        {'pattern': ['error'], 'range': '20180201000000-20180301000000'})
+for entry in result['entries']:
+    print(entry['raw_text'])
+```
+Configuration keys are the argparse destinations (`pattern`, `rpattern`,
+`range`/`utc`, `last`, `source`, `rsource`, `shost`, `rshost`, `dhost`,
+`rdhost`, `process`, `rprocess`, `protocol`, `rprotocol`).  List-style
+options take lists; `range`/`last` take strings.  Stateful filters
+(`range`, `last`) evaluate one window over the fully merged, sorted stream.
+The pipeline order and dependency fields can be inspected with
+`logdissect.filters.build_plan(config)` or the `--filter-plan` CLI option.
+
 # Output Modules
 ## myoutput = logdissect.output.\<output\>.OutputModule()
 Replace \<output\> with one of the available filters:

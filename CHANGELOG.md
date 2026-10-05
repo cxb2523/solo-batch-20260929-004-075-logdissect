@@ -2,8 +2,16 @@
 Change log for [logdissect](https://github.com/dogoncouch/logdissect)
 
 ## [Unreleased]
+### Added
+- `--filter-plan` prints the registered filter pipeline (options, dependency fields, execution order) and exits
+- `make filter-plan` generates `build/filters.html`, the same plan as an HTML page
+- Registry based filter pipeline: filters self-report CLI flags, value kinds and dependency fields; argparse options are generated from the registry and duplicate long/short options now raise an explicit error
+- `logdissect.core.run_library_job(files, config)` runs the same registry pipeline as the CLI for library callers
+
 ### Fixed
 - Tests will no longer break on year change.
+- `rgrep` library/CLI calls now compile each supplied pattern correctly
+- `rsource` no longer errors on entries without a log source field
 
 ## [3.1.1] 2018-04-07
 ### Fixed

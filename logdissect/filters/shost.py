@@ -1,17 +1,17 @@
 # MIT License
-# 
+#
 # Copyright (c) 2017 Dan Persons <dpersonsdev@gmail.com>
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,36 +20,35 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters import Filter, register, FilterOption
 
-class FilterModule(OurModule):
-    def __init__(self, args=None):
-        """Initialize the source host filter module"""
-        self.name = "shost"
-        self.desc = "match a source host"
 
-        if args:
-            args.add_argument('--shost', action='append', dest='shost',
-                    help='match a source host')
+@register
+class FilterModule(Filter):
+    name = "shost"
+    desc = "match a source host"
+    required_fields = ('source_host',)
+    stateful = False
+    priority = 30
+    options = [
+            FilterOption('--shost', action='append', dest='shost',
+                    metavar='SHOST', kind='list',
+                    help='match a source host'),
+            ]
 
-    def filter_data(self, data, values=None, args=None):
+    def filter_data(self, data, values=None, args=None, **kwargs):
         """Return entries from specified source host (single log)"""
-        if args:
-            if not args.shost:
-                return data
-        if not values: values = args.shost
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
+        if args is not None:
+            values = args.shost
+        if not values:
+            return data
+
+        newdata = {'entries': []}
+        self.copy_meta(data, newdata)
 
         for entry in data['entries']:
-            if 'source_host' in entry.keys():
-                if entry['source_host'] in values:
-                    newdata['entries'].append(entry)
+            if 'source_host' in entry and \
+                    entry['source_host'] in values:
+                newdata['entries'].append(entry)
 
         return newdata

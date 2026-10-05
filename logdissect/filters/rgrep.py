@@ -1,17 +1,17 @@
 # MIT License
-# 
+#
 # Copyright (c) 2017 Dan Persons <dpersonsdev@gmail.com>
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -21,44 +21,44 @@
 # SOFTWARE.
 
 import re
-from logdissect.filters.type import FilterModule as OurModule
+from logdissect.filters import Filter, register, FilterOption
 
-class FilterModule(OurModule):
-    def __init__(self, args=None):
-        """Initialize the rgrep filter module"""
-        self.name = "rgrep"
-        self.desc = "filter out a pattern"
 
-        if args:
-            args.add_argument('--rgrep', action='append', dest='rpattern',
-                    metavar='PATTERN', help='filter out a pattern')
+@register
+class FilterModule(Filter):
+    name = "rgrep"
+    desc = "filter out a pattern"
+    required_fields = ('raw_text',)
+    stateful = False
+    # Reverse exclusion band: runs after positive content/attribute
+    # predicates.  Because rgrep is itself a per-entry predicate the
+    # relative order cannot change the result.
+    priority = 40
+    options = [
+            FilterOption('--rgrep', action='append', dest='rpattern',
+                    metavar='PATTERN', kind='list',
+                    help='filter out a pattern'),
+            ]
 
-    def filter_data(self, data, values=None, args=None):
-        """Remove entries containing specified pattern (single log)"""
-        if args:
-            if not args.rpattern:
-                return data
-        if not values: values = args.rpattern
-        newdata = {}
-        if 'parser' in data.keys():
-            newdata['parser'] = data['parser']
-            newdata['source_path'] = data['source_path']
-            newdata['source_file'] = data['source_file']
-            newdata['source_file_mtime'] = data['source_file_mtime']
-            newdata['source_file_year'] = data['source_file_year']
-        newdata['entries'] = []
+    def filter_data(self, data, values=None, args=None, **kwargs):
+        """Remove entries containing specified patterns (single log)"""
+        if args is not None:
+            values = args.rpattern
+        if not values:
+            return data
 
-        repatterns = {}
-        for rpat in values:
-            repatterns[rpat] = re.compile(r".*({}).*".format(args.rpattern))
+        newdata = {'entries': []}
+        self.copy_meta(data, newdata)
+
+        repatterns = [re.compile(r".*({}).*".format(pat)) for pat in values]
 
         for entry in data['entries']:
-            match = False
-            for r in args.rpattern:
-                if re.match(repatterns[r], entry['raw_text']):
-                    match = True
-
-            if not match:
+            matched = False
+            for repat in repatterns:
+                if re.match(repat, entry['raw_text']):
+                    matched = True
+                    break
+            if not matched:
                 newdata['entries'].append(entry)
 
         return newdata

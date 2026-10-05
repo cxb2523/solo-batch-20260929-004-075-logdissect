@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # MIT License
 #
 # Copyright (c) 2017 Dan Persons <dpersonsdev@gmail.com>
@@ -20,34 +22,29 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from logdissect.filters import Filter, register, FilterOption
+"""``python -m logdissect`` entry point.
+
+Subcommands:
+  filter-plan   write the HTML pipeline page (build/filters.html)
+
+Without a subcommand the normal CLI job runs.
+"""
+
+import sys
+from logdissect.core import main as run_cli
+from logdissect.core import write_filter_plan_page
 
 
-@register
-class FilterModule(Filter):
-    name = "source"
-    desc = "match a log source"
-    required_fields = ('log_source',)
-    stateful = False
-    priority = 30
-    options = [
-            FilterOption('--source', action='append', dest='source',
-                    metavar='SOURCE', kind='list',
-                    help='match a log source'),
-            ]
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == 'filter-plan':
+        out = argv[1] if len(argv) > 1 else 'build/filters.html'
+        path = write_filter_plan_page(out)
+        print('Wrote filter pipeline plan to {}'.format(path))
+        return 0
+    run_cli()
+    return 0
 
-    def filter_data(self, data, values=None, args=None, **kwargs):
-        """Return entries from specified log source (single log)"""
-        if args is not None:
-            values = args.source
-        if not values:
-            return data
 
-        newdata = {'entries': []}
-        self.copy_meta(data, newdata)
-
-        for entry in data['entries']:
-            if 'log_source' in entry and entry['log_source'] in values:
-                newdata['entries'].append(entry)
-
-        return newdata
+if __name__ == '__main__':
+    sys.exit(main())

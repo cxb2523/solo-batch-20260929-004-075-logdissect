@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from logdissect.core import LogDissectCore
+from logdissect.core import main
 
-dissect = LogDissectCore()
-dissect.run_job()
+if __name__ == '__main__':
+    main()
